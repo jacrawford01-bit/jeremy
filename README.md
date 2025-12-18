@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel Odyssey | AI Creator Platform</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #7000ff;
+            --accent: #f59e0b;
+            --bg: #020617;
+            --surface: #0f172a;
+            --surface-light: #1e293b;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --founder-gold: #fbbf24;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        #overlay-screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+            transition: opacity 0.5s ease;
+        }
+
+        .hero-title {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            margin: 0;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+            letter-spacing: -2px;
+        }
+
+        .server-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 3rem;
+            width: 90%;
+            max-width: 800px;
+        }
+
+        .server-card {
+            background: var(--surface);
+            border: 2px solid var(--surface-light);
+            padding: 2.5rem;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: center;
+        }
+
+        .server-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-8px);
+            background: rgba(0, 243, 255, 0.05);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* --- DASHBOARD & MENU --- */
+        #tab-menu {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.9);
+            backdrop-filter: blur(12px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .menu-window {
+            background: var(--surface);
+            width: 95%;
+            max-width: 900px;
+            height: 80vh;
+            border-radius: 2rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 80px rgba(0,0,0,0.8);
+        }
+
+        .menu-nav {
+            display: flex;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .menu-tab {
+            padding: 12px 24px;
+            border-radius: 12px;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .menu-tab.active {
+            color: #fff;
+            background: var(--secondary);
+            box-shadow: 0 4px 15px rgba(112, 0, 255, 0.3);
+        }
+
+        .pane {
+            flex: 1;
+            padding: 2rem;
+            display: none;
+            overflow-y: auto;
+        }
+
+        .pane.active { display: flex; flex-direction: column; }
+
+        /* --- AI ASSISTANT CHAT --- */
+        .ai-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+        }
+
+        .chat-history {
+            flex: 1;
+            background: rgba(0,0,0,0.2);
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .msg {
+            max-width: 85%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .msg-ai { background: var(--surface-light); align-self: flex-start; border-bottom-left-radius: 4px; border-left: 4px solid var(--primary); }
+        .msg-user { background: var(--secondary); align-self: flex-end; border-bottom-right-radius: 4px; color: white; }
+
+        .chat-input-area {
+            display: flex;
+            gap: 12px;
+            padding: 5px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--surface-light);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 16px;
+            border-radius: 14px;
+            color: white;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        .chat-send {
+            background: var(--primary);
+            color: var(--bg);
+            border: none;
+            padding: 0 28px;
+            border-radius: 14px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .chat-send:hover { transform: scale(1.05); background: #fff; }
+
+        /* --- FOUNDER PANEL --- */
+        .founder-only {
+            display: none;
+            border: 2px solid var(--founder-gold);
+            padding: 20px;
+            border-radius: 15px;
+            background: rgba(251, 191, 36, 0.05);
+            margin-top: 20px;
+        }
+
+        .founder-active .founder-only {
+            display: block;
+        }
+
+        .founder-badge {
+            display: none;
+            color: var(--founder-gold);
+            font-weight: bold;
+            font-size: 0.7rem;
+            border: 1px solid var(--founder-gold);
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+
+        /* --- HUD --- */
+        #game-ui {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .stat-bar {
+            position: fixed;
+            top: 1.5rem;
+            left: 1.5rem;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(15px);
+            padding: 12px 24px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            pointer-events: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .notif {
+            background: var(--surface);
+            padding: 14px 22px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    </style>
+</head>
+<body class="">
+
+    <!-- Start Screen -->
+    <div id="overlay-screen">
+        <h1 class="hero-title">VOXEL ODYSSEY</h1>
+        <p style="color: var(--text-dim); margin: 15px 0 30px; letter-spacing: 2px; font-weight: 500;">AI GENERATIVE SANDBOX</p>
+        
+        <div class="server-grid">
+            <div class="server-card" onclick="startWorld('public')">
+                <div style="font-size: 2.5rem; margin-bottom: 10px;">🌍</div>
+                <h3>Public Multiverse</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Shared space for all creators.</p>
+            </div>
+            <div class="server-card" onclick="startWorld('private')">
+                <div style="font-size: 2.5rem; margin-bottom: 10px;">🔒</div>
+                <h3>Private Sandbox</h3>
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Isolated testing and building.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gameplay HUD -->
+    <div id="game-ui">
+        <div class="stat-bar">
+            <span style="color: var(--primary); font-weight: 900; letter-spacing: 1px;" id="server-label">SANDBOX</span>
+            <span class="founder-badge" id="hud-founder-badge">FOUNDER</span>
+            <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.1);"></div>
+            <span id="coord-display">POS: 0, 0, 0</span>
+            <span style="font-size: 0.7rem; background: var(--secondary); padding: 4px 10px; border-radius: 6px; font-weight: bold;">PRESS 'E' FOR AI BRAIN</span>
+        </div>
+    </div>
+
+    <!-- AI Dashboard -->
+    <div id="tab-menu">
+        <div class="menu-window">
+            <div class="menu-nav">
+                <div class="menu-tab active" onclick="switchTab(event, 'dash')">ODYSSEY CORE</div>
+                <div class="menu-tab" onclick="switchTab(event, 'mods')">PHYSICS ENGINE</div>
+                <div class="menu-tab" onclick="switchTab(event, 'founders-tab')">FOUNDERS</div>
+            </div>
+
+            <div id="dash" class="pane active">
+                <div class="ai-container">
+                    <div class="chat-history" id="chat-history">
+                        <div class="msg msg-ai">Odyssey Core Online. I have full access to the world's source code. <br><br>I can rewrite the physics, create complex structures, or add new mechanics. What shall we manifest today?</div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="ai-input" class="chat-input" placeholder="Give a complex command..." autocomplete="off">
+                        <button class="chat-send" id="ai-send-btn">GENERATE</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="mods" class="pane">
+                <h2 style="margin-top:0">System Parameters</h2>
+                <div id="param-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="param-item">
+                        <label>Gravity</label>
+                        <input type="range" min="0" max="100" value="28" oninput="updateConfig('gravity', this.value)">
+                    </div>
+                    <div class="param-item">
+                        <label>Speed</label>
+                        <input type="range" min="1" max="50" value="12" oninput="updateConfig('speed', this.value)">
+                    </div>
+                </div>
+                <button style="margin-top: 20px; padding: 15px; background: var(--primary); color: #000; border: none; border-radius: 10px; cursor: pointer; font-weight: bold;" onclick="resetWorld()">Regenerate World</button>
+            </div>
+
+            <div id="founders-tab" class="pane">
+                <div id="founder-lock-screen">
+                    <h2>Founders Access</h2>
+                    <p>Enter the secret code to unlock Founder Abilities.</p>
+                    <div class="chat-input-area">
+                        <input type="password" id="founder-code-input" class="chat-input" placeholder="Enter Code...">
+                        <button class="chat-send" onclick="checkFounderCode()">UNLOCK</button>
+                    </div>
+                </div>
+                
+                <div id="founder-unlocked-screen" style="display:none">
+                    <h2 style="color: var(--founder-gold)">Founder Panel Unlocked</h2>
+                    <p>You have access to experimental reality-bending tools.</p>
+                    <div class="founder-only" style="display:block">
+                        <h3>Abilities</h3>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="chat-send" style="background: var(--founder-gold)" onclick="toggleNoclip()">Toggle Noclip (Flight)</button>
+                            <button class="chat-send" style="background: var(--founder-gold)" onclick="setSuperSpeed()">Super Speed</button>
+                            <button class="chat-send" style="background: var(--founder-gold)" onclick="resetAbilities()">Reset Abilities</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notif-container" style="position: fixed; bottom: 30px; right: 30px; z-index: 5000; width: 300px;"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Environment Config
+        const apiKey = ""; 
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'voxel-odyssey-ai';
+
+        // Engine Globals
+        let scene, camera, renderer, clock, currentUser;
+        let move = { f: false, b: false, l: false, r: false };
+        let vel = new THREE.Vector3();
+        let rot = { yaw: 0, pitch: 0 };
+        let isFounder = false;
+        
+        // Expose to AI
+        window.world = {
+            scene: null,
+            camera: null,
+            config: {
+                gravity: 28,
+                speed: 12,
+                jump: 12,
+                noclip: false,
+                skyColor: "#020617",
+                fogDensity: 0.015
+            },
+            spawned: []
+        };
+
+        const chunks = new Map();
+        const players = new Map();
+
+        // Founders Logic
+        window.checkFounderCode = () => {
+            const code = document.getElementById('founder-code-input').value;
+            if(code === "5674") {
+                isFounder = true;
+                document.getElementById('founder-lock-screen').style.display = 'none';
+                document.getElementById('founder-unlocked-screen').style.display = 'block';
+                document.getElementById('hud-founder-badge').style.display = 'inline-block';
+                document.body.classList.add('founder-active');
+                notify("FOUNDER ACCESS GRANTED");
+                addChatMessage("Founder link established. I can now execute high-tier reality manipulation for you.", "ai");
+            } else {
+                notify("INVALID CODE");
+            }
+        };
+
+        window.toggleNoclip = () => {
+            window.world.config.noclip = !window.world.config.noclip;
+            notify(`NOCLIP: ${window.world.config.noclip ? "ON" : "OFF"}`);
+        };
+
+        window.setSuperSpeed = () => {
+            window.world.config.speed = 50;
+            notify("SUPER SPEED ACTIVE");
+        };
+
+        window.resetAbilities = () => {
+            window.world.config.speed = 12;
+            window.world.config.noclip = false;
+            notify("ABILITIES RESET");
+        };
+
+        window.updateConfig = (key, val) => {
+            window.world.config[key] = parseFloat(val);
+            notify(`${key.toUpperCase()} UPDATED`);
+        };
+
+        // Notification Helper
+        window.notify = (msg) => {
+            const container = document.getElementById('notif-container');
+            const div = document.createElement('div');
+            div.className = 'notif';
+            div.innerText = msg;
+            container.prepend(div);
+            setTimeout(() => {
+                div.style.opacity = '0';
+                div.style.transform = 'translateX(20px)';
+                setTimeout(() => div.remove(), 300);
+            }, 3000);
+        };
+
+        // World Startup
+        window.startWorld = async (type) => {
+            document.getElementById('overlay-screen').style.opacity = '0';
+            setTimeout(async () => {
+                document.getElementById('overlay-screen').style.display = 'none';
+                initEngine();
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            }, 500);
+        };
+
+        // --- AI BRAIN: DYNAMIC CODE EXECUTION ---
+        async function handleAISubmit() {
+            const input = document.getElementById('ai-input');
+            const query = input.value.trim();
+            if(!query) return;
+
+            addChatMessage(query, 'user');
+            input.value = '';
+
+            const systemPrompt = `You are the Odyssey AI Core. You have full control over a Three.js voxel engine.
+            
+            USER STATUS: ${isFounder ? "FOUNDER (UNRESTRICTED ACCESS)" : "STANDARD USER"}
+            
+            WORLD CONTEXT:
+            - Global 'window.world' object contains 'scene', 'camera', and 'config'.
+            - THREE is available globally.
+            - Terrain height at (x, z) can be found using 'getTerrainHeight(x, z)'.
+            
+            JSON RESPONSE FORMAT:
+            {
+              "reply": "Conversational text.",
+              "configUpdates": { "gravity": 10, "speed": 15 },
+              "customCode": "JS code as string."
+            }
+            
+            If the user is a FOUNDER, you can be much more complex with your customCode (e.g., massive structures, physics overrides).`;
+
+            const callGemini = async (retries = 0) => {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: query }] }],
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+                    if (!response.ok) throw new Error(response.status);
+                    return await response.json();
+                } catch (e) {
+                    if (retries < 5) {
+                        await new Promise(r => setTimeout(r, Math.pow(2, retries) * 1000));
+                        return callGemini(retries + 1);
+                    }
+                    throw e;
+                }
+            };
+
+            try {
+                const data = await callGemini();
+                const aiResult = JSON.parse(data.candidates[0].content.parts[0].text);
+                
+                addChatMessage(aiResult.reply, 'ai');
+
+                if(aiResult.configUpdates) {
+                    Object.assign(window.world.config, aiResult.configUpdates);
+                    syncPhysics();
+                }
+
+                if(aiResult.customCode) {
+                    try {
+                        const effect = new Function('THREE', 'scene', 'camera', 'world', aiResult.customCode);
+                        effect(THREE, scene, camera, window.world);
+                        notify("AI CODE INJECTED");
+                    } catch (codeErr) {
+                        notify("AI Code Compile Error");
+                    }
+                }
+            } catch (e) {
+                addChatMessage("Neural link unstable. Please try again.", 'ai');
+            }
+        }
+
+        function syncPhysics() {
+            const cfg = window.world.config;
+            if (scene) {
+                scene.background.set(cfg.skyColor);
+                scene.fog.color.set(cfg.skyColor);
+                scene.fog.density = cfg.fogDensity || 0.015;
+            }
+        }
+
+        function addChatMessage(text, role) {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.className = `msg msg-${role}`;
+            div.innerHTML = text.replace(/\n/g, '<br>');
+            history.appendChild(div);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function initEngine() {
+            scene = new THREE.Scene();
+            window.world.scene = scene;
+            scene.background = new THREE.Color(window.world.config.skyColor);
+            scene.fog = new THREE.FogExp2(window.world.config.skyColor, 0.015);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            window.world.camera = camera;
+            camera.rotation.order = "YXZ";
+            camera.position.set(0, 10, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
